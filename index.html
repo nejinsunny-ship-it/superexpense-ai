@@ -1,20 +1,46 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>SuperExpense AI</title>
   <meta name="theme-color" content="#090d16" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <!-- Tailwind CSS & Chart.js -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8',
+              accent: '#00F0FF', neon: '#CCFF00', dark: '#090d16', card: '#111827'
+            }
+          },
+          fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
   <style>
-    body { background-color: #090d16; color: #f3f4f6; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background-color: #090d16; color: #f3f4f6; -webkit-tap-highlight-color: transparent; }
     .glass { background: rgba(17, 24, 39, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
     .glass-input { background: rgba(31, 41, 55, 0.6); border: 1px solid rgba(255, 255, 255, 0.12); color: #fff; }
-    .glass-input:focus { border-color: #00F0FF; outline: none; }
+    .glass-input:focus { border-color: #00F0FF; outline: none; box-shadow: 0 0 10px rgba(0, 240, 255, 0.2); }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 1rem); }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
   </style>
 </head>
-<body class="min-h-screen flex flex-col pb-20">
+<body class="min-h-screen flex flex-col font-sans antialiased pb-24">
 
   <!-- Header -->
   <header class="sticky top-0 z-40 glass px-4 py-3 flex items-center justify-between border-b border-gray-800">
@@ -22,62 +48,122 @@
       <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-lime-400 flex items-center justify-center font-extrabold text-black text-lg">⚡</div>
       <h1 class="text-xl font-bold bg-gradient-to-r from-white via-cyan-200 to-cyan-400 bg-clip-text text-transparent">SuperExpense AI</h1>
     </div>
-    <button onclick="toggleModal('settings-modal', true)" class="p-2 rounded-xl glass hover:bg-gray-800 text-gray-300">⚙️ Settings</button>
+    <div class="flex items-center space-x-2">
+      <button onclick="toggleModal('alarm-modal', true)" class="p-2 rounded-xl glass hover:bg-gray-800 text-gray-300 text-sm">⏰</button>
+      <button onclick="toggleModal('settings-modal', true)" class="p-2 rounded-xl glass hover:bg-gray-800 text-gray-300 text-sm">⚙️</button>
+    </div>
   </header>
 
   <!-- Status / Alert Banner -->
-  <div id="status-banner" class="hidden px-4 py-2 text-xs flex justify-between items-center">
-    <span id="status-text"></span>
-    <button onclick="document.getElementById('status-banner').classList.add('hidden')" class="font-bold ml-2">✕</button>
+  <div id="status-banner" class="hidden px-4 py-2 text-xs flex justify-between items-center transition-all">
+    <span id="status-text" class="truncate pr-2"></span>
+    <button onclick="document.getElementById('status-banner').classList.add('hidden')" class="font-bold ml-2 shrink-0">✕</button>
   </div>
 
+  <!-- MAIN TAB CONTENT -->
   <main class="flex-1 max-w-lg w-full mx-auto p-4 space-y-6">
 
-    <!-- Upload Section -->
-    <section class="glass rounded-2xl p-5 border border-cyan-500/20 relative overflow-hidden">
-      <h2 class="text-sm font-semibold text-cyan-400 uppercase tracking-wider mb-2">Scan Screenshot</h2>
-      <p class="text-xs text-gray-400 mb-4">Upload payment screenshots or transaction history (SuperMoney, GPay, PhonePe, Paytm).</p>
+    <!-- TAB 1: SCANNER & EXPENSES -->
+    <div id="tab-dashboard" class="space-y-6">
+      <!-- Upload Card -->
+      <section class="glass rounded-2xl p-5 border border-cyan-500/20 relative overflow-hidden">
+        <h2 class="text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-1">AI Screenshot Reader</h2>
+        <p class="text-xs text-gray-400 mb-4 leading-relaxed">Upload screenshots from SuperMoney, GPay, PhonePe, or Paytm.</p>
 
-      <div id="drop-zone" class="border-2 border-dashed border-gray-700 hover:border-cyan-400 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer bg-gray-900/40">
-        <div class="w-12 h-12 rounded-full bg-cyan-950/60 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-2xl mb-3">📸</div>
-        <p class="text-sm font-medium text-gray-200">Tap to upload transaction screenshot</p>
-        <p class="text-xs text-gray-500 mt-1">Multi-transaction AI Extraction</p>
-        <input type="file" id="file-input" accept="image/*" class="hidden" />
-      </div>
+        <div id="drop-zone" class="border-2 border-dashed border-gray-700 hover:border-cyan-400 rounded-xl p-5 flex flex-col items-center justify-center text-center cursor-pointer bg-gray-900/40 transition-colors">
+          <div class="w-12 h-12 rounded-full bg-cyan-950/60 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-2xl mb-2">📸</div>
+          <p class="text-sm font-medium text-gray-200">Tap to upload transaction screenshot</p>
+          <p class="text-[11px] text-gray-500 mt-1">Multi-transaction AI Extraction</p>
+          <input type="file" id="file-input" accept="image/*" class="hidden" />
+        </div>
 
-      <!-- Scanning Spinner Overlay -->
-      <div id="scanning-overlay" class="hidden absolute inset-0 glass bg-black/90 flex flex-col items-center justify-center z-10 p-4 text-center">
-        <div class="w-12 h-12 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p id="scanning-status" class="text-sm font-semibold text-cyan-300">Scanning using Gemini AI...</p>
-        <p class="text-xs text-gray-400 mt-1">Extracting all transactions from image</p>
-      </div>
-    </section>
+        <!-- Scanning Spinner Overlay -->
+        <div id="scanning-overlay" class="hidden absolute inset-0 glass bg-black/90 flex flex-col items-center justify-center z-10 p-4 text-center">
+          <div class="w-10 h-10 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mb-3"></div>
+          <p id="scanning-status" class="text-sm font-semibold text-cyan-300">Scanning using Gemini AI...</p>
+          <p class="text-xs text-gray-400 mt-1">Extracting all visible transactions</p>
+        </div>
+      </section>
 
-    <!-- Totals -->
-    <section class="grid grid-cols-2 gap-3">
-      <div class="glass p-4 rounded-xl">
-        <p class="text-xs text-gray-400">Total Spent</p>
-        <p id="total-spent" class="text-xl font-extrabold text-white mt-1">₹0</p>
-      </div>
-      <div class="glass p-4 rounded-xl">
-        <p class="text-xs text-gray-400">Transactions</p>
-        <p id="total-count" class="text-xl font-extrabold text-cyan-400 mt-1">0</p>
-      </div>
-    </section>
-
-    <!-- Expenses List -->
-    <section class="space-y-3">
+      <!-- Quick Action Toolbar -->
       <div class="flex justify-between items-center">
-        <h3 class="text-sm font-bold text-gray-300">Recent Expenses</h3>
-        <button onclick="exportCSV()" class="text-xs text-gray-400 hover:text-white">Export CSV</button>
+        <button onclick="toggleModal('manual-modal', true)" class="text-xs font-medium text-cyan-400 hover:underline flex items-center space-x-1">
+          <span>✏️ Manual Entry</span>
+        </button>
+        <button onclick="exportCSV()" class="text-xs text-gray-400 hover:text-white flex items-center space-x-1">
+          <span>📥 Export CSV</span>
+        </button>
       </div>
-      <div id="expense-list" class="space-y-2">
-        <p class="text-xs text-gray-500 text-center py-6">No expenses logged yet.</p>
+
+      <!-- Totals Grid -->
+      <section class="grid grid-cols-2 gap-3">
+        <div class="glass p-4 rounded-xl">
+          <p class="text-xs text-gray-400">Total Spent</p>
+          <p id="total-spent" class="text-xl font-extrabold text-white mt-1 truncate">₹0</p>
+        </div>
+        <div class="glass p-4 rounded-xl">
+          <p class="text-xs text-gray-400">Transactions</p>
+          <p id="total-count" class="text-xl font-extrabold text-cyan-400 mt-1 truncate">0</p>
+        </div>
+      </section>
+
+      <!-- Expense List -->
+      <section class="space-y-3">
+        <h3 class="text-sm font-bold text-gray-300">Recent Transactions</h3>
+        <div id="expense-list" class="space-y-2">
+          <p class="text-xs text-gray-500 text-center py-6">No expenses logged yet.</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- TAB 2: REPORTS & ANALYTICS -->
+    <div id="tab-reports" class="hidden space-y-6">
+      <div class="glass p-5 rounded-2xl border border-gray-800 space-y-4">
+        <h2 class="text-sm font-bold text-white">Expense Distribution</h2>
+        <div class="w-full h-64 flex items-center justify-center">
+          <canvas id="categoryChart"></canvas>
+        </div>
       </div>
-    </section>
+      <div id="category-breakdown" class="space-y-2">
+        <!-- Rendered breakdown -->
+      </div>
+    </div>
+
+    <!-- TAB 3: CATEGORY MANAGEMENT -->
+    <div id="tab-categories" class="hidden space-y-6">
+      <div class="glass p-5 rounded-2xl border border-gray-800 space-y-4">
+        <h2 class="text-sm font-bold text-white">Manage Categories</h2>
+        <div class="flex space-x-2">
+          <input type="text" id="new-category-input" placeholder="New Category Name..." class="flex-1 glass-input rounded-xl px-3 py-2 text-sm" />
+          <button onclick="addCategory()" class="bg-cyan-500 text-black px-4 py-2 rounded-xl font-bold text-sm">Add</button>
+        </div>
+      </div>
+      <div id="categories-list" class="space-y-2">
+        <!-- Rendered categories -->
+      </div>
+    </div>
+
   </main>
 
-  <!-- Settings Modal -->
+  <!-- NAVIGATION BAR (BOTTOM FIXED) -->
+  <nav class="fixed bottom-0 left-0 right-0 z-40 glass border-t border-gray-800 px-6 py-2 pb-safe">
+    <div class="max-w-lg mx-auto flex justify-around items-center">
+      <button onclick="switchTab('dashboard')" id="nav-dashboard" class="flex flex-col items-center space-y-1 text-cyan-400">
+        <span class="text-lg">💳</span>
+        <span class="text-[10px] font-medium">Expenses</span>
+      </button>
+      <button onclick="switchTab('reports')" id="nav-reports" class="flex flex-col items-center space-y-1 text-gray-500 hover:text-white">
+        <span class="text-lg">📊</span>
+        <span class="text-[10px] font-medium">Analytics</span>
+      </button>
+      <button onclick="switchTab('categories')" id="nav-categories" class="flex flex-col items-center space-y-1 text-gray-500 hover:text-white">
+        <span class="text-lg">🏷️</span>
+        <span class="text-[10px] font-medium">Categories</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- MODAL: SETTINGS -->
   <div id="settings-modal" class="hidden fixed inset-0 z-50 glass bg-black/80 flex items-center justify-center p-4">
     <div class="glass max-w-sm w-full rounded-2xl p-5 border border-gray-700 space-y-4">
       <div class="flex justify-between items-center">
@@ -89,36 +175,100 @@
         <input type="password" id="api-key-input" placeholder="AIzaSy..." class="w-full glass-input rounded-xl px-3 py-2 text-sm" />
         <p class="text-[10px] text-gray-400 mt-1">Get free key at <a href="https://aistudio.google.com/" target="_blank" class="text-cyan-400 underline">aistudio.google.com</a></p>
       </div>
-      <button onclick="saveSettings()" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold py-2 rounded-xl text-sm">Save Key</button>
+      <button onclick="saveSettings()" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold py-2.5 rounded-xl text-sm">Save Key</button>
     </div>
   </div>
 
+  <!-- MODAL: MANUAL ENTRY -->
+  <div id="manual-modal" class="hidden fixed inset-0 z-50 glass bg-black/80 flex items-center justify-center p-4">
+    <div class="glass max-w-sm w-full rounded-2xl p-5 border border-gray-700 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-white">Add Expense Manually</h3>
+        <button onclick="toggleModal('manual-modal', false)" class="text-gray-400 text-lg">✕</button>
+      </div>
+      <form id="manual-form" onsubmit="handleManualSubmit(event)" class="space-y-3">
+        <div>
+          <label class="text-xs text-gray-400">Merchant / Recipient</label>
+          <input type="text" id="manual-merchant" required placeholder="Swiggy, Amazon, etc." class="w-full glass-input rounded-xl px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400">Amount (₹)</label>
+          <input type="number" step="any" id="manual-amount" required placeholder="250" class="w-full glass-input rounded-xl px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400">Category</label>
+          <select id="manual-category" class="w-full glass-input rounded-xl px-3 py-2 text-sm bg-gray-900"></select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400">Date</label>
+          <input type="date" id="manual-date" required class="w-full glass-input rounded-xl px-3 py-2 text-sm" />
+        </div>
+        <button type="submit" class="w-full bg-cyan-500 text-black font-bold py-2.5 rounded-xl text-sm">Add Expense</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ALARM REMINDER -->
+  <div id="alarm-modal" class="hidden fixed inset-0 z-50 glass bg-black/80 flex items-center justify-center p-4">
+    <div class="glass max-w-sm w-full rounded-2xl p-5 border border-gray-700 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-white">Daily Reminder</h3>
+        <button onclick="toggleModal('alarm-modal', false)" class="text-gray-400 text-lg">✕</button>
+      </div>
+      <p class="text-xs text-gray-400">Set a daily alert to remind you to upload payment screenshots.</p>
+      <div>
+        <label class="text-xs font-medium text-gray-300 block mb-1">Reminder Time</label>
+        <input type="time" id="alarm-time" class="w-full glass-input rounded-xl px-3 py-2 text-sm" />
+      </div>
+      <button onclick="saveAlarm()" class="w-full bg-cyan-500 text-black font-bold py-2.5 rounded-xl text-sm">Enable Notification</button>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT APP ENGINE -->
   <script>
+    // State Initialization
     let expenses = JSON.parse(localStorage.getItem('superexpense_data') || '[]');
+    let categories = JSON.parse(localStorage.getItem('superexpense_categories') || '["Food & Dining", "Shopping", "UPI Transfer", "Bills & Utilities", "Entertainment", "Other"]');
     let apiKey = localStorage.getItem('superexpense_apikey') || '';
+    let alarmTime = localStorage.getItem('superexpense_alarm') || '21:00';
+    let myChart = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('api-key-input').value = apiKey;
+      document.getElementById('alarm-time').value = alarmTime;
+      document.getElementById('manual-date').value = new Date().toISOString().split('T')[0];
+
       renderExpenses();
+      renderCategoryDropdowns();
+      renderCategoriesList();
 
       const dropZone = document.getElementById('drop-zone');
       const fileInput = document.getElementById('file-input');
-
       dropZone.addEventListener('click', () => fileInput.click());
       fileInput.addEventListener('change', (e) => {
         if (e.target.files && e.target.files[0]) processImage(e.target.files[0]);
       });
+
+      checkAlarm();
+      setInterval(checkAlarm, 60000);
     });
 
     function toggleModal(id, show) {
       document.getElementById(id).classList.toggle('hidden', !show);
     }
 
-    function saveSettings() {
-      apiKey = document.getElementById('api-key-input').value.trim();
-      localStorage.setItem('superexpense_apikey', apiKey);
-      toggleModal('settings-modal', false);
-      showBanner('API Key saved!', false);
+    function switchTab(tab) {
+      ['dashboard', 'reports', 'categories'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab);
+        const navBtn = document.getElementById(`nav-${t}`);
+        if (t === tab) {
+          navBtn.className = 'flex flex-col items-center space-y-1 text-cyan-400';
+        } else {
+          navBtn.className = 'flex flex-col items-center space-y-1 text-gray-500 hover:text-white';
+        }
+      });
+
+      if (tab === 'reports') renderReports();
     }
 
     function showBanner(msg, isError = true) {
@@ -129,9 +279,17 @@
       banner.classList.remove('hidden');
     }
 
+    function saveSettings() {
+      apiKey = document.getElementById('api-key-input').value.trim();
+      localStorage.setItem('superexpense_apikey', apiKey);
+      toggleModal('settings-modal', false);
+      showBanner('API Key saved successfully!', false);
+    }
+
+    // MULTI-TRANSACTION OCR PROCESSOR
     async function processImage(file) {
       if (!apiKey) {
-        showBanner('Missing Gemini API Key! Click Settings (⚙️) to enter your key.', true);
+        showBanner('Missing Gemini API Key! Click Settings (⚙️) to enter key.', true);
         return;
       }
 
@@ -147,16 +305,15 @@
         const extractedList = await callGeminiAPI(base64Img);
 
         if (extractedList && extractedList.length > 0) {
-          // Unshift all items so newer items appear top
           expenses = [...extractedList, ...expenses];
           localStorage.setItem('superexpense_data', JSON.stringify(expenses));
           renderExpenses();
-          showBanner(`Extracted ${extractedList.length} transaction(s) successfully!`, false);
+          showBanner(`Successfully extracted ${extractedList.length} transaction(s)!`, false);
         } else {
-          showBanner('Gemini AI could not extract valid transactions from this image.', true);
+          showBanner('Gemini AI could not find valid transactions in this image.', true);
         }
       } catch (err) {
-        console.error('Scan Failed:', err);
+        console.error('Scan Error:', err);
         showBanner(`Scanning Failed: ${err.message}`, true);
       } finally {
         overlay.classList.add('hidden');
@@ -166,24 +323,22 @@
 
     async function callGeminiAPI(base64Data) {
       const cleanBase64 = base64Data.replace(/^data:image\/(png|jpeg|webp|jpg);base64,/, '');
-      
       const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash'];
 
-      // Instructed to return an ARRAY of transactions
-      const promptText = `Examine this payment or transaction screenshot (SuperMoney, PhonePe, Paytm, Google Pay, Bank Statement). 
-Identify EVERY transaction visible in the image. 
-Return raw JSON with a single key "transactions" containing an array of objects matching this exact structure:
+      const promptText = `Examine this payment/UPI screenshot (SuperMoney, PhonePe, Paytm, Google Pay, Bank Statement). 
+Extract EVERY transaction visible into raw JSON. 
+Structure format:
 {
   "transactions": [
     {
       "merchant": "Merchant or Receiver Name",
       "amount": 200,
-      "category": "Food & Dining | Shopping | UPI Transfer | Bills & Utilities | Other",
+      "category": "${categories.join(' | ')}",
       "date": "YYYY-MM-DD"
     }
   ]
 }
-If no readable transactions are present, return {"transactions": []}. Return ONLY valid raw JSON without markdown or formatting.`;
+If unreadable, return {"transactions": []}. Return ONLY valid JSON, no markdown.`;
 
       let lastError = '';
 
@@ -234,7 +389,7 @@ If no readable transactions are present, return {"transactions": []}. Return ONL
             id: Date.now() + idx,
             merchant: t.merchant || 'UPI Merchant',
             amount: parseFloat(t.amount) || 0,
-            category: t.category || 'UPI Transfer',
+            category: categories.includes(t.category) ? t.category : 'Other',
             date: t.date || todayStr
           })).filter(t => t.amount > 0);
 
@@ -273,6 +428,61 @@ If no readable transactions are present, return {"transactions": []}. Return ONL
       });
     }
 
+    // CATEGORY MANAGEMENT
+    function renderCategoryDropdowns() {
+      const select = document.getElementById('manual-category');
+      select.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    function renderCategoriesList() {
+      const container = document.getElementById('categories-list');
+      container.innerHTML = categories.map((c, idx) => `
+        <div class="glass p-3 rounded-xl flex justify-between items-center">
+          <span class="text-sm font-semibold text-white">${c}</span>
+          <button onclick="deleteCategory(${idx})" class="text-gray-500 hover:text-red-400 text-xs">✕ Delete</button>
+        </div>
+      `).join('');
+    }
+
+    function addCategory() {
+      const input = document.getElementById('new-category-input');
+      const val = input.value.trim();
+      if (val && !categories.includes(val)) {
+        categories.push(val);
+        localStorage.setItem('superexpense_categories', JSON.stringify(categories));
+        renderCategoryDropdowns();
+        renderCategoriesList();
+        input.value = '';
+      }
+    }
+
+    function deleteCategory(index) {
+      if (categories.length <= 1) return alert('You must keep at least one category.');
+      categories.splice(index, 1);
+      localStorage.setItem('superexpense_categories', JSON.stringify(categories));
+      renderCategoryDropdowns();
+      renderCategoriesList();
+    }
+
+    // MANUAL SUBMIT
+    function handleManualSubmit(e) {
+      e.preventDefault();
+      const merchant = document.getElementById('manual-merchant').value.trim();
+      const amount = parseFloat(document.getElementById('manual-amount').value);
+      const category = document.getElementById('manual-category').value;
+      const date = document.getElementById('manual-date').value;
+
+      if (merchant && !isNaN(amount)) {
+        expenses.unshift({ id: Date.now(), merchant, amount, category, date });
+        localStorage.setItem('superexpense_data', JSON.stringify(expenses));
+        renderExpenses();
+        toggleModal('manual-modal', false);
+        e.target.reset();
+        document.getElementById('manual-date').value = new Date().toISOString().split('T')[0];
+      }
+    }
+
+    // RENDER EXPENSES
     function renderExpenses() {
       const container = document.getElementById('expense-list');
       const totalSpentEl = document.getElementById('total-spent');
@@ -290,11 +500,11 @@ If no readable transactions are present, return {"transactions": []}. Return ONL
         total += Number(item.amount || 0);
         return `
           <div class="glass p-3 rounded-xl flex justify-between items-center border-l-4 border-cyan-400">
-            <div>
-              <p class="text-sm font-semibold text-white">${item.merchant}</p>
+            <div class="pr-2 truncate">
+              <p class="text-sm font-semibold text-white truncate">${item.merchant}</p>
               <p class="text-[10px] text-gray-400">${item.date} • <span class="text-cyan-400">${item.category}</span></p>
             </div>
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-3 shrink-0">
               <span class="text-sm font-extrabold text-white">₹${item.amount}</span>
               <button onclick="deleteExpense(${idx})" class="text-gray-500 hover:text-red-400 text-xs">✕</button>
             </div>
@@ -312,6 +522,67 @@ If no readable transactions are present, return {"transactions": []}. Return ONL
       renderExpenses();
     }
 
+    // REPORTS / CHART.JS
+    function renderReports() {
+      const ctx = document.getElementById('categoryChart').getContext('2d');
+      const catTotals = {};
+
+      categories.forEach(c => catTotals[c] = 0);
+      expenses.forEach(e => {
+        catTotals[e.category] = (catTotals[e.category] || 0) + Number(e.amount || 0);
+      });
+
+      const labels = Object.keys(catTotals).filter(k => catTotals[k] > 0);
+      const data = labels.map(k => catTotals[k]);
+
+      if (myChart) myChart.destroy();
+
+      myChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: ['#00F0FF', '#CCFF00', '#3B82F6', '#EC4899', '#8B5CF6', '#10B981', '#F59E0B'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { color: '#9CA3AF', font: { size: 10 } } } }
+        }
+      });
+
+      const breakdownContainer = document.getElementById('category-breakdown');
+      breakdownContainer.innerHTML = labels.map(l => `
+        <div class="glass p-3 rounded-xl flex justify-between items-center">
+          <span class="text-xs text-gray-300 font-medium">${l}</span>
+          <span class="text-xs font-bold text-cyan-400">₹${catTotals[l].toLocaleString('en-IN')}</span>
+        </div>
+      `).join('');
+    }
+
+    // ALARM / REMINDER
+    function saveAlarm() {
+      alarmTime = document.getElementById('alarm-time').value;
+      localStorage.setItem('superexpense_alarm', alarmTime);
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        Notification.requestPermission();
+      }
+      toggleModal('alarm-modal', false);
+      showBanner(`Daily reminder set for ${alarmTime}`, false);
+    }
+
+    function checkAlarm() {
+      const now = new Date();
+      const current = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      if (current === alarmTime && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('SuperExpense AI', { body: '⏰ Time to scan today payment screenshots!' });
+      }
+    }
+
+    // EXPORT
     function exportCSV() {
       if (!expenses.length) return alert('No data to export!');
       let csv = 'Date,Merchant,Category,Amount\n';
