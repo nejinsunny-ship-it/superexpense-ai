@@ -124,12 +124,57 @@
 
     <!-- TAB 2: REPORTS & ANALYTICS -->
     <div id="tab-reports" class="hidden space-y-6">
+      
+      <!-- Date Filter Bar -->
+      <div class="glass p-4 rounded-2xl border border-gray-800 space-y-3">
+        <h2 class="text-xs font-semibold text-cyan-400 uppercase tracking-wider">Time Window Filter</h2>
+        
+        <!-- Filter Buttons -->
+        <div class="grid grid-cols-4 gap-1.5 bg-gray-900/60 p-1 rounded-xl">
+          <button id="filter-btn-all" onclick="setAnalyticsFilter('all')" class="py-1.5 text-xs font-medium rounded-lg text-white bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">All</button>
+          <button id="filter-btn-month" onclick="setAnalyticsFilter('month')" class="py-1.5 text-xs font-medium rounded-lg text-gray-400 hover:text-white">Month</button>
+          <button id="filter-btn-week" onclick="setAnalyticsFilter('week')" class="py-1.5 text-xs font-medium rounded-lg text-gray-400 hover:text-white">Week</button>
+          <button id="filter-btn-custom" onclick="setAnalyticsFilter('custom')" class="py-1.5 text-xs font-medium rounded-lg text-gray-400 hover:text-white">Custom</button>
+        </div>
+
+        <!-- Custom Date Range Picker Inputs (Hidden by default) -->
+        <div id="custom-date-container" class="hidden grid grid-cols-2 gap-2 pt-2 border-t border-gray-800">
+          <div>
+            <label class="text-[10px] text-gray-400 block mb-1">Start Date</label>
+            <input type="date" id="filter-start-date" onchange="renderReports()" class="w-full glass-input rounded-xl px-2 py-1 text-xs" />
+          </div>
+          <div>
+            <label class="text-[10px] text-gray-400 block mb-1">End Date</label>
+            <input type="date" id="filter-end-date" onchange="renderReports()" class="w-full glass-input rounded-xl px-2 py-1 text-xs" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Range Summary Cards -->
+      <div class="grid grid-cols-3 gap-2">
+        <div class="glass p-3 rounded-xl">
+          <p class="text-[10px] text-gray-400">Range Spent</p>
+          <p id="range-total-spent" class="text-sm font-extrabold text-white mt-1 truncate">₹0</p>
+        </div>
+        <div class="glass p-3 rounded-xl">
+          <p class="text-[10px] text-gray-400">Count</p>
+          <p id="range-total-count" class="text-sm font-extrabold text-cyan-400 mt-1 truncate">0</p>
+        </div>
+        <div class="glass p-3 rounded-xl">
+          <p class="text-[10px] text-gray-400">Daily Avg</p>
+          <p id="range-daily-avg" class="text-sm font-extrabold text-lime-400 mt-1 truncate">₹0</p>
+        </div>
+      </div>
+
+      <!-- Doughnut Chart Card -->
       <div class="glass p-5 rounded-2xl border border-gray-800 space-y-4">
         <h2 class="text-sm font-bold text-white">Expense Distribution</h2>
         <div class="w-full h-64 flex items-center justify-center">
           <canvas id="categoryChart"></canvas>
         </div>
       </div>
+
+      <!-- Detailed Breakdown -->
       <div id="category-breakdown" class="space-y-2">
         <!-- Rendered breakdown -->
       </div>
@@ -278,11 +323,18 @@
     let alarmTime = localStorage.getItem('superexpense_alarm') || '21:00';
     let myChart = null;
 
+    // Analytics State
+    let currentAnalyticsFilter = 'all'; // 'all', 'month', 'week', 'custom'
+
     document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('api-key-input').value = apiKey;
       document.getElementById('model-override-input').value = customModel;
       document.getElementById('alarm-time').value = alarmTime;
-      document.getElementById('manual-date').value = new Date().toISOString().split('T')[0];
+      
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('manual-date').value = today;
+      document.getElementById('filter-start-date').value = today;
+      document.getElementById('filter-end-date').value = today;
 
       renderExpenses();
       renderCategoryDropdowns();
@@ -444,262 +496,4 @@ If unreadable, return {"transactions": []}. Return ONLY valid JSON, no markdown.
           const data = await response.json();
           const rawOutput = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
           
-          const cleanJson = rawOutput.replace(/```json/g, '').replace(/```/g, '').trim();
-          const parsed = JSON.parse(cleanJson);
-
-          const items = parsed.transactions || (Array.isArray(parsed) ? parsed : []);
-
-          if (!items.length) {
-            throw new Error('No transactions found in this image.');
-          }
-
-          const todayStr = new Date().toISOString().split('T')[0];
-
-          return items.map((t, idx) => ({
-            id: Date.now() + idx,
-            merchant: t.merchant || 'UPI Merchant',
-            amount: parseFloat(t.amount) || 0,
-            category: categories.includes(t.category) ? t.category : 'Other',
-            date: t.date || todayStr
-          })).filter(t => t.amount > 0);
-
-        } catch (e) {
-          lastError = e.message;
-          console.warn(`Model ${model} failed:`, e.message);
-        }
-      }
-
-      throw new Error(lastError || 'Gemini API call failed.');
-    }
-
-    function resizeImage(file, maxWidth) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            let w = img.width, h = img.height;
-            if (w > maxWidth) {
-              h = Math.round((h * maxWidth) / w);
-              w = maxWidth;
-            }
-            canvas.width = w;
-            canvas.height = h;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL('image/jpeg', 0.85));
-          };
-          img.onerror = reject;
-          img.src = e.target.result;
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    }
-
-    // CATEGORY MANAGEMENT
-    function renderCategoryDropdowns() {
-      const selectManual = document.getElementById('manual-category');
-      const selectEdit = document.getElementById('edit-category');
-      const optionsHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
-      selectManual.innerHTML = optionsHTML;
-      selectEdit.innerHTML = optionsHTML;
-    }
-
-    function renderCategoriesList() {
-      const container = document.getElementById('categories-list');
-      container.innerHTML = categories.map((c, idx) => `
-        <div class="glass p-3 rounded-xl flex justify-between items-center">
-          <span class="text-sm font-semibold text-white">${c}</span>
-          <button onclick="deleteCategory(${idx})" class="text-gray-500 hover:text-red-400 text-xs">✕ Delete</button>
-        </div>
-      `).join('');
-    }
-
-    function addCategory() {
-      const input = document.getElementById('new-category-input');
-      const val = input.value.trim();
-      if (val && !categories.includes(val)) {
-        categories.push(val);
-        localStorage.setItem('superexpense_categories', JSON.stringify(categories));
-        renderCategoryDropdowns();
-        renderCategoriesList();
-        input.value = '';
-      }
-    }
-
-    function deleteCategory(index) {
-      if (categories.length <= 1) return alert('You must keep at least one category.');
-      categories.splice(index, 1);
-      localStorage.setItem('superexpense_categories', JSON.stringify(categories));
-      renderCategoryDropdowns();
-      renderCategoriesList();
-    }
-
-    // MANUAL & EDIT SUBMITS
-    function handleManualSubmit(e) {
-      e.preventDefault();
-      const merchant = document.getElementById('manual-merchant').value.trim();
-      const amount = parseFloat(document.getElementById('manual-amount').value);
-      const category = document.getElementById('manual-category').value;
-      const date = document.getElementById('manual-date').value;
-
-      if (merchant && !isNaN(amount)) {
-        expenses.unshift({ id: Date.now(), merchant, amount, category, date });
-        localStorage.setItem('superexpense_data', JSON.stringify(expenses));
-        renderExpenses();
-        toggleModal('manual-modal', false);
-        e.target.reset();
-        document.getElementById('manual-date').value = new Date().toISOString().split('T')[0];
-      }
-    }
-
-    function openEditModal(index) {
-      const item = expenses[index];
-      if (!item) return;
-
-      document.getElementById('edit-id').value = index;
-      document.getElementById('edit-merchant').value = item.merchant;
-      document.getElementById('edit-amount').value = item.amount;
-      document.getElementById('edit-category').value = categories.includes(item.category) ? item.category : categories[0];
-      document.getElementById('edit-date').value = item.date || new Date().toISOString().split('T')[0];
-
-      toggleModal('edit-modal', true);
-    }
-
-    function handleEditSubmit(e) {
-      e.preventDefault();
-      const index = parseInt(document.getElementById('edit-id').value, 10);
-      if (isNaN(index) || !expenses[index]) return;
-
-      expenses[index] = {
-        ...expenses[index],
-        merchant: document.getElementById('edit-merchant').value.trim(),
-        amount: parseFloat(document.getElementById('edit-amount').value),
-        category: document.getElementById('edit-category').value,
-        date: document.getElementById('edit-date').value
-      };
-
-      localStorage.setItem('superexpense_data', JSON.stringify(expenses));
-      renderExpenses();
-      toggleModal('edit-modal', false);
-      showBanner('Transaction updated successfully!', false);
-    }
-
-    // RENDER EXPENSES
-    function renderExpenses() {
-      const container = document.getElementById('expense-list');
-      const totalSpentEl = document.getElementById('total-spent');
-      const totalCountEl = document.getElementById('total-count');
-
-      if (!expenses.length) {
-        container.innerHTML = `<p class="text-xs text-gray-500 text-center py-6">No expenses logged yet.</p>`;
-        totalSpentEl.innerText = '₹0';
-        totalCountEl.innerText = '0';
-        return;
-      }
-
-      let total = 0;
-      container.innerHTML = expenses.map((item, idx) => {
-        total += Number(item.amount || 0);
-        return `
-          <div class="glass p-3 rounded-xl flex justify-between items-center border-l-4 border-cyan-400">
-            <div class="pr-2 truncate cursor-pointer" onclick="openEditModal(${idx})">
-              <p class="text-sm font-semibold text-white truncate">${item.merchant}</p>
-              <p class="text-[10px] text-gray-400">${item.date} • <span class="text-cyan-400">${item.category}</span></p>
-            </div>
-            <div class="flex items-center space-x-2 shrink-0">
-              <span class="text-sm font-extrabold text-white mr-1">₹${item.amount}</span>
-              <button onclick="openEditModal(${idx})" class="p-1 text-gray-400 hover:text-cyan-400 text-xs" title="Edit">✏️</button>
-              <button onclick="deleteExpense(${idx})" class="p-1 text-gray-500 hover:text-red-400 text-xs" title="Delete">✕</button>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      totalSpentEl.innerText = `₹${total.toLocaleString('en-IN')}`;
-      totalCountEl.innerText = expenses.length;
-    }
-
-    function deleteExpense(index) {
-      expenses.splice(index, 1);
-      localStorage.setItem('superexpense_data', JSON.stringify(expenses));
-      renderExpenses();
-    }
-
-    // REPORTS / CHART.JS
-    function renderReports() {
-      const ctx = document.getElementById('categoryChart').getContext('2d');
-      const catTotals = {};
-
-      categories.forEach(c => catTotals[c] = 0);
-      expenses.forEach(e => {
-        catTotals[e.category] = (catTotals[e.category] || 0) + Number(e.amount || 0);
-      });
-
-      const labels = Object.keys(catTotals).filter(k => catTotals[k] > 0);
-      const data = labels.map(k => catTotals[k]);
-
-      if (myChart) myChart.destroy();
-
-      myChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels,
-          datasets: [{
-            data,
-            backgroundColor: ['#00F0FF', '#CCFF00', '#3B82F6', '#EC4899', '#8B5CF6', '#10B981', '#F59E0B'],
-            borderWidth: 0
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom', labels: { color: '#9CA3AF', font: { size: 10 } } } }
-        }
-      });
-
-      const breakdownContainer = document.getElementById('category-breakdown');
-      breakdownContainer.innerHTML = labels.map(l => `
-        <div class="glass p-3 rounded-xl flex justify-between items-center">
-          <span class="text-xs text-gray-300 font-medium">${l}</span>
-          <span class="text-xs font-bold text-cyan-400">₹${catTotals[l].toLocaleString('en-IN')}</span>
-        </div>
-      `).join('');
-    }
-
-    // ALARM / REMINDER
-    function saveAlarm() {
-      alarmTime = document.getElementById('alarm-time').value;
-      localStorage.setItem('superexpense_alarm', alarmTime);
-      if ('Notification' in window && Notification.permission !== 'granted') {
-        Notification.requestPermission();
-      }
-      toggleModal('alarm-modal', false);
-      showBanner(`Daily reminder set for ${alarmTime}`, false);
-    }
-
-    function checkAlarm() {
-      const now = new Date();
-      const current = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      if (current === alarmTime && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification('SuperExpense AI', { body: '⏰ Time to scan today payment screenshots!' });
-      }
-    }
-
-    // EXPORT
-    function exportCSV() {
-      if (!expenses.length) return alert('No data to export!');
-      let csv = 'Date,Merchant,Category,Amount\n';
-      expenses.forEach(e => csv += `"${e.date}","${e.merchant}","${e.category}",${e.amount}\n`);
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `expenses-${new Date().toISOString().split('T')[0]}.csv`;
-      a.click();
-    }
-  </script>
-</body>
-</html>
+          const cleanJson = rawOutput.replace(/```json/g, '').replace(/
