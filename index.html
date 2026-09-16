@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="en" class="dark h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>SuperExpense AI - Mobile Expense Tracker</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#090d16">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SuperExpense">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" href="icon-192.png">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            bg: '#0b0e14',
+                            card: '#151b26',
+                            border: '#232d3f',
+                            accent: '#10b981',
+                            purple: '#8b5cf6',
+                            textPrimary: '#f3f4f6',
+                            textSecondary: '#9ca3af'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif']
+                    }
+                }
+            }
+        };
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Tesseract.js OCR engine for reliable client-side OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0b0e14;
+            color: #f3f4f6;
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            min-height: -webkit-fill-available;
+            padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+            padding-top: env(safe-area-inset-top, 0px);
+        }
+
+        /* Safe area support for iOS/Android bottom bar */
+        .safe-area-bottom {
+            padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b0e14;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #232d3f;
+            border-radius: 9999px;
+        }
+
+        /* Prevent text overflow and wrapping issues on small screens */
+        .truncate-1 {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .truncate-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Glassmorphism effects */
+        .glass-panel {
+            background: rgba(21, 27, 38, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Active navigation state */
+        .nav-item.active {
+            color: #10b981;
+        }
+        .nav-item.active i {
+            transform: translateY(-2px);
+        }
+
+        /* Pulse animation for scanner */
+        @keyframes scanLine {
+            0% { top: 0%; opacity: 0.8; }
+            50% { opacity: 1; }
+            100% { top: 95%; opacity: 0.8; }
+        }
+        .scanner-line {
+            position: absolute;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #10b981, #8b5cf6, transparent);
+            box-shadow: 0 0 12px #10b981;
+            animation: scanLine 2s ease-in-out infinite alternate;
+        }
+    </style>
+</head>
+<body class="bg-brand-bg text-brand-textPrimary antialiased flex flex-col justify-between selection:bg-emerald-500 selection:text-white">
+
+    <!-- TOP HEADER -->
+    <header class="sticky top-0 z-30 w-full glass-panel border-b border-brand-border px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-2.5 min-w-0">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-purple-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+                <i class="fa-solid font-bold text-white text-base fa-bolt"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+                <h1 class="text-base font-bold text-white tracking-tight truncate flex items-center gap-1.5">
+                    SuperExpense <span class="bg-emerald-500/20 text-emerald-400 text-[10px] font-semibold px-1.5 py-0.5 rounded border border-emerald-500/30">AI</span>
+                </h1>
+                <p class="text-[11px] text-brand-textSecondary truncate">Smart Receipt & UPI Tracker</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2 shrink-0">
+            <button onclick="toggleSettingsModal()" class="w-9 h-9 rounded-xl bg-brand-card border border-brand-border flex items-center justify-center text-brand-textSecondary hover:text-white active:scale-95 transition-all" aria-label="Settings">
+                <i class="fa-solid fa-gear text-sm"></i>
+            </button>
+            <button onclick="toggleInstallModal()" class="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 active:scale-95 transition-all" aria-label="Install App">
+                <i class="fa-solid fa-download text-sm"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-1 w-full max-w-2xl mx-auto px-3.5 py-4 space-y-4">
+
+        <!-- ========================================== -->
+        <!-- TAB 1: SCAN & ADD RECEIPT (OCR ENGINE) -->
+        <!-- ========================================== -->
+        <section id="tab-scan" class="tab-content space-y-4">
+            
+            <!-- Direct Quick Expense Entry Card -->
+            <div class="bg-brand-card border border-brand-border rounded-2xl p-4 shadow-xl">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-pen-to-square text-emerald-400"></i> Quick Manual Entry
+                    </h2>
+                    <span class="text-[11px] text-brand-textSecondary">Instant Add</span>
+                </div>
+                <form id="quickAddForm" onsubmit="handleQuickAdd(event)" class="space-y-3">
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div class="col-span-1">
+                            <label class="block text-[11px] font-medium text-brand-textSecondary mb-1">Amount (₹)</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-brand-textSecondary text-xs font-semibold">₹</span>
+                                <input type="number" step="0.01" id="quickAmount" placeholder="200" required class="w-full pl-7 pr-2.5 py-2.5 bg-brand-bg border border-brand-border rounded-xl text-white text-sm font-semibold focus:outline-none focus:border-emerald-500 transition-all">
+                            </div>
+                        </div>
+                        <div class="col-span-1">
+                            <label class="block text-[11px] font-medium text-brand-textSecondary mb-1">Category</label>
+                            <select id="quickCategory" class="w-full px-2.5 py-2.5 bg-brand-bg border border-brand-border rounded-xl text-white text-xs font-medium focus:outline-none focus:border-emerald-500 transition-all">
+                                <!-- Dynamic options injected -->
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="quickNote" placeholder="e.g. Swiggy, Coffee, Auto fare" required class="flex-1 px-3 py-2.5 bg-brand-bg border border-brand-border rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500 transition-all">
+                        <button type="submit" class="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-brand-bg font-bold text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95 shrink-0 flex items-center gap-1.5">
+                            <i class="fa-solid fa-plus text-xs"></i> Add
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- OCR / Screenshot Scanner Upload Area -->
+            <div class="bg-brand-card border border-brand-border rounded-2xl p-4 shadow-xl text-center relative overflow-hidden">
+                <div class="mb-3">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 text-[11px] font-semibold">
+                        <i class="fa-solid fa-wand-magic-sparkles text-xs"></i> AI OCR Screenshot Reader
+                    </span>
+                    <h3 class="text-base font-bold text-white mt-2">Scan Payment / UPI Receipt</h3>
+                    <p class="text-xs text-brand-textSecondary mt-0.5">Upload PhonePe, GPay, Paytm or bill screenshot</p>
+                </div>
+
+                <!-- Dropzone Area -->
+                <div id="dropZone" onclick="document.getElementById('fileInput').click()" class="border-2 border-dashed border-brand-border rounded-xl p-6 hover:border-emerald-500/50 transition-all cursor-pointer bg-brand-bg/50 relative overflow-hidden group">
+                    <input type="file" id="fileInput" accept="image/*" capture="environment" class="hidden" onchange="handleFileSelect(event)">
+                    
+                    <div id="uploadPrompt" class="space-y-3">
+                        <div class="w-14 h-14 rounded-2xl bg-brand-card border border-brand-border flex items-center justify-center mx-auto text-emerald-400 group-hover:scale-110 transition-transform shadow-inner">
+                            <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-white">Tap to Choose Screenshot or Image</p>
+                            <p class="text-[10px] text-brand-textSecondary mt-0.5">Reads amounts like ₹200, ₹60, ₹1450 automatically</p>
+                        </div>
+                        <div class="flex items-center justify-center gap-2 pt-1">
+                            <span class="px-3 py-1.5 rounded-lg bg-brand-card border border-brand-border text-brand-textSecondary text-[11px] font-medium flex items-center gap-1.5">
+                                <i class="fa-regular fa-image text-emerald-400"></i> Gallery
+                            </span>
+                            <span class="px-3 py-1.5 rounded-lg bg-brand-card border border-brand-border text-brand-textSecondary text-[11px] font-medium flex items-center gap-1.5">
+                                <i class="fa-solid fa-camera text-purple-400"></i> Camera
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Scanner Preview State -->
+                    <div id="scannerPreview" class="hidden relative max-w-xs mx-auto">
+                        <div class="relative rounded-lg overflow-hidden border border-brand-border max-h-56">
+                            <img id="previewImg" src="" alt="Receipt Preview" class="w-full h-auto object-cover mx-auto">
+                            <div id="scanLine" class="scanner-line hidden"></div>
+                        </div>
+                        <p id="scanStatus" class="text-xs font-semibold text-emerald-400 mt-2 flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-spinner fa-spin"></i> Processing image text...
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Mode Indicator / Notice -->
+                <div class="mt-3 flex items-center justify-between text-[11px] text-brand-textSecondary px-1">
+                    <span id="ocrEngineLabel" class="flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span> Client OCR Engine Active
+                    </span>
+                    <button onclick="toggleSettingsModal()" class="text-purple-400 hover:underline">Configure Gemini Key</button>
+                </div>
+            </div>
+
+            <!-- OCR Result Modal / Card (Shows when image processed) -->
+            <div id="ocrResultCard" class="hidden bg-brand-card border border-emerald-500/40 rounded-2xl p-4 shadow-2xl space-y-3">
+                <div class="flex items-center justify-between pb-2 border-b border-brand-border">
+                    <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i> Extracted Receipt Data
+                    </h3>
+                    <span class="text-[10px] text-brand-textSecondary">Verify details below</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-[11px] font-medium text-brand-textSecondary mb-1">Detected Amount</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 font-bold text-xs">₹</span>
+                            <input type="number" step="0.01" id="ocrAmount" class="w-full pl-7 pr-2.5 py-2 bg-brand-bg border border-brand-border rounded-xl text-white font-bold text-sm focus:border-emerald-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-medium text-brand-textSecondary mb-1">Category</label>
+                        <select id="ocrCategory" class="w-full px-2.5 py-2 bg-brand-bg border border-brand-border rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none">
+                            <!-- Injected Dynamically -->
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-medium text-brand-textSecondary mb-1">Merchant / Note</label>
+                    <input type="text" id="ocrNote" placeholder="Store or payment reference" class="w-full px-3 py-2 bg-brand-bg border border-brand-border rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none">
+                </div>
+
+                <div class="flex gap-2 pt-1">
+                    <button onclick="discardOcrResult()" class="flex-1 py-2.5 bg-brand-bg border border-brand-border hover:bg-red-500/10 text-red-400 font-semibold text-xs rounded-xl transition-all">
+                        Discard
+                    </button>
+                    <button onclick="saveOcrExpense()" class="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-brand-bg font-bold text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20">
+                        Confirm & Save
+                    </button>
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- ========================================== -->
+        <!-- TAB 2: DAILY EXPENSE LOG & CATEGORIES -->
+        <!-- ========================================== -->
+        <section id="tab-log" class="tab-content hidden space-y-4">
+            
+            <!-- Filter & Search Bar -->
+            <div class="flex flex-col sm:flex-row gap-2">
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-brand-textSecondary text-xs"></i>
+                    <input type="text" id="searchInput" oninput="renderExpenses()" placeholder="Search transactions..." class="w-full pl-8 pr-3 py-2 bg-brand-card border border-brand-border rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500">
+                </div>
+                <div class="flex gap-2">
+                    <select id="filterCategory" onchange="renderExpenses()" class="flex-1 sm:w-36 px-2.5 py-2 bg-brand-card border border-brand-border rounded-xl text-white text-xs focus:outline-none">
+                        <option value="ALL">All Categories</option>
+                        <!-- Dynamic options -->
+                    </select>
+                    <button onclick="openCategoryManagerModal()" class="px-3 py-2 bg-purple-500/10 border border-purple-500/30 text-purple-400 rounded-xl text-xs font-semibold hover:bg-purple-500/20 shrink-0 flex items-center gap-1">
+                        <i class="fa-solid fa-sliders text-xs"></i> Categories
+                    </button>
+                </div>
+            </div>
+
+            <!-- Expense List Container -->
+            <div id="expenseListContainer" class="space-y-3">
+                <!-- Grouped transactions rendered via JS -->
+            </div>
+
+        </section>
+
+
+        <!-- ========================================== -->
+        <!-- TAB 3: ANALYTICS & STATS DASHBOARD -->
+        <!-- ========================================== -->
+        <section id="tab-analytics" class="tab-content hidden space-y-4">
+            
+            <!-- Summary Metric Cards -->
+            <div class="grid grid-cols-2 gap-2.5">
+                <div class="bg-brand-card border border-brand-border rounded-2xl p-3.5 shadow-lg">
+                    <div class="flex items-center justify-between text-brand-textSecondary mb-1">
+                        <span class="text-[11px] font-medium">Spent Today</span>
+                        <i class="fa-solid fa-calendar-day text-emerald-400 text-xs"></i>
+                    </div>
+                    <div id="statSpentToday" class="text-lg font-bold text-white truncate">₹0.00</div>
+                    <div id="statTodayCount" class="text-[10px] text-brand-textSecondary mt-0.5">0 transactions</div>
+                </div>
+
+                <div class="bg-brand-card border border-brand-border rounded-2xl p-3.5 shadow-lg">
+                    <div class="flex items-center justify-between text-brand-textSecondary mb-1">
+                        <span class="text-[11px] font-medium">This Month</span>
+                        <i class="fa-solid fa-chart-line text-purple-400 text-xs"></i>
+                    </div>
+                    <div id="statSpentMonth" class="text-lg font-bold text-white truncate">₹0.00</div>
+                    <div id="statTopCategory" class="text-[10px] text-emerald-400 font-semibold truncate mt-0.5">Top: -</div>
+                </div>
+            </div>
+
+            <!-- SVG Donut Category Breakdown Chart -->
+            <div class="bg-brand-card border border-brand-border rounded-2xl p-4 shadow-xl">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-chart-pie text-emerald-400"></i> Category Spend Distribution
+                    </h3>
+                    <span class="text-[10px] text-brand-textSecondary">Monthly Share</span>
+                </div>
+
+                <div class="flex flex-col sm:flex-row items-center justify-around gap-4 py-2">
+                    <div class="relative w-40 h-40 flex items-center justify-center shrink-0">
+                        <svg id="donutChartSvg" class="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                            <!-- Dynamic SVG chart arcs injected here -->
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-2">
+                            <span class="text-[10px] text-brand-textSecondary">Total</span>
+                            <span id="donutTotalText" class="text-xs font-bold text-white truncate max-w-[100px]">₹0</span>
+                        </div>
+                    </div>
+
+                    <div id="chartLegend" class="w-full flex-1 space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                        <!-- Legend items injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export / Data Actions -->
+            <div class="bg-brand-card border border-brand-border rounded-2xl p-3.5 flex items-center justify-between">
+                <div>
+                    <h4 class="text-xs font-bold text-white">Export Expense History</h4>
+                    <p class="text-[10px] text-brand-textSecondary">Download CSV spreadsheet for accounting</p>
+                </div>
+                <button onclick="exportToCSV()" class="px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold hover:bg-emerald-500/20 active:scale-95 transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-csv"></i> Export CSV
+                </button>
+            </div>
+
+        </section>
+
+
+        <!-- ========================================== -->
+        <!-- TAB 4: ALARMS & REMINDERS -->
+        <!-- ========================================== -->
+        <section id="tab-alarm" class="tab-content hidden space-y-4">
+            
+            <div class="bg-brand-card border border-brand-border rounded-2xl p-4 shadow-xl space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-brand-border">
+                    <div>
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i class="fa-regular fa-bell text-purple-400"></i> Daily Spend Reminder
+                        </h3>
+                        <p class="text-xs text-brand-textSecondary mt-0.5">Never forget to log your daily UPI payments</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="alarmToggle" onchange="toggleAlarmSetting()" class="sr-only peer">
+                        <div class="w-11 h-6 bg-brand-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </label>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-brand-textSecondary mb-1">Set Daily Alarm Time</label>
+                        <input type="time" id="alarmTimeInput" onchange="saveAlarmTime()" class="w-full px-3 py-2.5 bg-brand-bg border border-brand-border rounded-xl text-white font-bold text-base focus:border-emerald-500 focus:outline-none">
+                    </div>
+
+                    <div class="p-3 rounded-xl bg-brand-bg border border-brand-border text-center">
+                        <span class="text-[11px] text-brand-textSecondary block">Status</span>
+                        <span id="alarmStatusText" class="text-xs font-semibold text-emerald-400 mt-0.5 block">Alarm Disabled</span>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button onclick="triggerTestAlarm()" class="flex-1 py-2.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 font-bold text-xs rounded-xl hover:bg-purple-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-volume-high"></i> Test Sound & Alarm Now
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- ========================================== -->
+    <!-- MODALS & OVERLAYS -->
+    <!-- ========================================== -->
+
+    <!-- SETTINGS / GEMINI KEY MODAL -->
+    <div id="settingsModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-brand-border">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-gear text-emerald-400"></i> Settings & Gemini Key
+                </h3>
+                <button onclick="toggleSettingsModal()" class="text-brand-textSecondary hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-brand-textSecondary mb-1">Google Gemini API Key (Optional)</label>
+                    <input type="password" id="geminiApiKeyInput" placeholder="AIZASy..." class="w-full px-3 py-2 bg-brand-bg border border-brand-border rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none">
+                    <p class="text-[10px] text-brand-textSecondary mt-1">If blank, local browser OCR (Tesseract) parses image amounts directly.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-brand-textSecondary mb-1">Currency Symbol</label>
+                    <input type="text" id="currencySymbolInput" value="₹" class="w-full px-3 py-2 bg-brand-bg border border-brand-border rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="pt-2 flex justify-end gap-2">
+                <button onclick="saveSettings()" class="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-brand-bg font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/20">
+                    Save Preferences
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CATEGORY MANAGER MODAL -->
+    <div id="categoryModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between pb-2 border-b border-brand-border shrink-0">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-tags text-purple-400"></i> Manage Expense Categories
+                </h3>
+                <button onclick="closeCategoryManagerModal()" class="text-brand-textSecondary hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+
+            <!-- Create Category Form -->
+            <form onsubmit="handleCreateCategory(event)" class="space-y-2 shrink-0 bg-brand-bg p-3 rounded-xl border border-brand-border">
+                <span class="text-[11px] font-semibold text-brand-textSecondary block">Add Custom Category</span>
+                <div class="flex gap-2">
+                    <input type="text" id="newCatName" placeholder="e.g. Subscriptions" required class="flex-1 px-2.5 py-1.5 bg-brand-card border border-brand-border rounded-lg text-white text-xs">
+                    <input type="color" id="newCatColor" value="#10b981" class="w-8 h-8 rounded-lg bg-brand-card border border-brand-border cursor-pointer p-0.5">
+                    <button type="submit" class="px-3 py-1.5 bg-purple-500 text-white font-bold text-xs rounded-lg hover:bg-purple-600">
+                        Add
+                    </button>
+                </div>
+            </form>
+
+            <!-- Category List -->
+            <div id="categoryListContainer" class="flex-1 overflow-y-auto space-y-2 pr-1">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- INSTALL PWA MODAL -->
+    <div id="installModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-brand-card border border-brand-border rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-brand-border">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-mobile-screen text-emerald-400"></i> Install SuperExpense AI
+                </h3>
+                <button onclick="toggleInstallModal()" class="text-brand-textSecondary hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs text-brand-textSecondary">
+                <div class="p-3 bg-brand-bg rounded-xl border border-brand-border space-y-1">
+                    <p class="font-bold text-white"><i class="fa-brands fa-android text-emerald-400 mr-1"></i> On Android (Chrome)</p>
+                    <p>Tap the 3 dots icon in browser header & select <b>"Add to Home Screen"</b> or <b>"Install App"</b>.</p>
+                </div>
+
+                <div class="p-3 bg-brand-bg rounded-xl border border-brand-border space-y-1">
+                    <p class="font-bold text-white"><i class="fa-brands fa-apple text-purple-400 mr-1"></i> On iPhone (Safari)</p>
+                    <p>Tap the Share button at bottom bar & select <b>"Add to Home Screen"</b>.</p>
+                </div>
+            </div>
+
+            <button onclick="toggleInstallModal()" class="w-full py-2.5 bg-brand-bg border border-brand-border text-white font-semibold text-xs rounded-xl">
+                Got It
+            </button>
+        </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- FLOATING BOTTOM NAVIGATION BAR -->
+    <!-- ========================================== -->
+    <nav class="fixed bottom-0 left-0 right-0 z-40 glass-panel border-t border-brand-border px-2 py-2 safe-area-bottom">
+        <div class="max-w-md mx-auto flex items-center justify-around">
+            
+            <button onclick="switchTab('scan')" id="nav-scan" class="nav-item active flex flex-col items-center justify-center w-16 py-1 text-brand-textSecondary transition-all">
+                <i class="fa-solid fa-qrcode text-lg mb-0.5"></i>
+                <span class="text-[10px] font-medium tracking-tight">Scan</span>
+            </button>
+
+            <button onclick="switchTab('log')" id="nav-log" class="nav-item flex flex-col items-center justify-center w-16 py-1 text-brand-textSecondary transition-all">
+                <i class="fa-solid fa-list-check text-lg mb-0.5"></i>
+                <span class="text-[10px] font-medium tracking-tight">Log</span>
+            </button>
+
+            <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-item flex flex-col items-center justify-center w-16 py-1 text-brand-textSecondary transition-all">
+                <i class="fa-solid fa-chart-pie text-lg mb-0.5"></i>
+                <span class="text-[10px] font-medium tracking-tight">Stats</span>
+            </button>
+
+            <button onclick="switchTab('alarm')" id="nav-alarm" class="nav-item flex flex-col items-center justify-center w-16 py-1 text-brand-textSecondary transition-all relative">
+                <i class="fa-regular fa-bell text-lg mb-0.5"></i>
+                <span class="text-[10px] font-medium tracking-tight">Alarm</span>
+            </button>
+
+        </div>
+    </nav>
+
+
+    <!-- ========================================== -->
+    <!-- JAVASCRIPT LOGIC & CONTROLLER -->
+    <!-- ========================================== -->
+    <script>
+        /* APP STATE & DEFAULTS */
+        let state = {
+            expenses: [],
+            categories: [
+                { id: 'food', name: 'Food & Dining', color: '#10b981', icon: 'fa-utensils' },
+                { id: 'shopping', name: 'Shopping', color: '#8b5cf6', icon: 'fa-bag-shopping' },
+                { id: 'travel', name: 'Travel & Transport', color: '#3b82f6', icon: 'fa-route' },
+                { id: 'bills', name: 'Bills & Utilities', color: '#f59e0b', icon: 'fa-receipt' },
+                { id: 'entertainment', name: 'Entertainment', color: '#ec4899', icon: 'fa-film' },
+                { id: 'general', name: 'General / Other', color: '#6b7280', icon: 'fa-tag' }
+            ],
+            settings: {
+                geminiApiKey: localStorage.getItem('super_gemini_key') || '',
+                currencySymbol: localStorage.getItem('super_currency') || '₹'
+            },
+            alarm: {
+                enabled: localStorage.getItem('super_alarm_enabled') === 'true',
+                time: localStorage.getItem('super_alarm_time') || '21:00'
+            },
+            currentOcrData: null
+        };
+
+        /* INITIALIZATION */
+        window.onload = function() {
+            loadFromStorage();
+            populateCategoryDropdowns();
+            renderExpenses();
+            renderAnalytics();
+            setupAlarmInterval();
+            updateAlarmUI();
+        };
+
+        /* TAB SWITCHER */
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+            const targetTab = document.getElementById(`tab-${tabId}`);
+            const targetNav = document.getElementById(`nav-${tabId}`);
+            
+            if (targetTab) targetTab.classList.remove('hidden');
+            if (targetNav) targetNav.classList.add('active');
+
+            if (tabId === 'analytics') renderAnalytics();
+            if (tabId === 'log') renderExpenses();
+        }
+
+        /* STORAGE HANDLERS */
+        function loadFromStorage() {
+            try {
+                const storedEx = localStorage.getItem('super_expenses');
+                if (storedEx) state.expenses = JSON.parse(storedEx);
+
+                const storedCat = localStorage.getItem('super_categories');
+                if (storedCat) state.categories = JSON.parse(storedCat);
+            } catch(e) {
+                console.error("Storage error:", e);
+            }
+        }
+
+        function saveExpensesToStorage() {
+            localStorage.setItem('super_expenses', JSON.stringify(state.expenses));
+            renderExpenses();
+            renderAnalytics();
+        }
+
+        function saveCategoriesToStorage() {
+            localStorage.setItem('super_categories', JSON.stringify(state.categories));
+            populateCategoryDropdowns();
+            renderExpenses();
+        }
+
+        /* POPULATE DROPDOWNS */
+        function populateCategoryDropdowns() {
+            const selects = ['quickCategory', 'ocrCategory', 'filterCategory'];
+            selects.forEach(selectId => {
+                const el = document.getElementById(selectId);
+                if (!el) return;
+
+                const currentVal = el.value;
+                el.innerHTML = '';
+
+                if (selectId === 'filterCategory') {
+                    el.innerHTML = '<option value="ALL">All Categories</option>';
+                }
+
+                state.categories.forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat.id;
+                    opt.textContent = cat.name;
+                    el.appendChild(opt);
+                });
+
+                if (currentVal) el.value = currentVal;
+            });
+        }
+
+        /* QUICK MANUAL ADD */
+        function handleQuickAdd(e) {
+            e.preventDefault();
+            const amount = parseFloat(document.getElementById('quickAmount').value);
+            const category = document.getElementById('quickCategory').value;
+            const note = document.getElementById('quickNote').value.trim();
+
+            if (!amount || amount <= 0) return;
+
+            const newExpense = {
+                id: 'ex_' + Date.now(),
+                amount: amount,
+                category: category,
+                note: note || 'Quick Expense',
+                date: new Date().toISOString()
+            };
+
+            state.expenses.unshift(newExpense);
+            saveExpensesToStorage();
+
+            // Reset Form
+            document.getElementById('quickAmount').value = '';
+            document.getElementById('quickNote').value = '';
+
+            // Brief user feedback
+            alertToast("Expense added successfully!");
+        }
+
+        /* OCR & IMAGE SCANNING ENGINE */
+        let lastOcrError = null;
+
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // UI Scanner state
+            document.getElementById('uploadPrompt').classList.add('hidden');
+            document.getElementById('scannerPreview').classList.remove('hidden');
+            document.getElementById('scanLine').classList.remove('hidden');
+            
+            const previewImg = document.getElementById('previewImg');
+            previewImg.src = URL.createObjectURL(file);
+
+            const statusText = document.getElementById('scanStatus');
+            statusText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reading image details...';
+            lastOcrError = null;
+
+            try {
+                let detectedAmount = 0;
+                let detectedNote = 'UPI Payment';
+                let detectedCategory = 'general';
+                let usedSource = '';
+
+                // Pre-process: downscale + grayscale + boost contrast.
+                // Raw colorful UPI screenshots (green/blue app backgrounds, anti-aliased
+                // fonts) OCR very poorly. This step dramatically improves accuracy for
+                // BOTH Gemini and Tesseract, and shrinks the payload sent to Gemini.
+                statusText.textContent = 'Enhancing image...';
+                const processedBlob = await preprocessImageForOcr(file);
+
+                // STEP 1: If Gemini API Key exists, use AI Vision API
+                if (state.settings.geminiApiKey && state.settings.geminiApiKey.trim() !== '') {
+                    statusText.textContent = 'Analyzing receipt with Gemini AI...';
+                    const base64Data = await fileToBase64(processedBlob);
+                    const geminiRes = await callGeminiVision(base64Data, state.settings.geminiApiKey);
+                    if (geminiRes) {
+                        detectedAmount = geminiRes.amount || 0;
+                        detectedNote = geminiRes.note || 'Payment Receipt';
+                        detectedCategory = matchCategoryByName(geminiRes.category);
+                        usedSource = 'gemini';
+                    }
+                }
+
+                // STEP 2: Fallback to Client-side Tesseract.js OCR
+                if (!detectedAmount || detectedAmount <= 0) {
+                    statusText.textContent = 'Processing OCR on device...';
+                    try {
+                        const { data: { text } } = await Tesseract.recognize(processedBlob, 'eng');
+
+                        // Regex search for amounts (e.g., ₹200, INR 60, 200.00)
+                        const parsed = extractAmountFromText(text);
+                        if (parsed.amount > 0) {
+                            detectedAmount = parsed.amount;
+                            detectedNote = parsed.note || 'Scanned Receipt';
+                            usedSource = usedSource || 'tesseract';
+                        } else if (!lastOcrError) {
+                            lastOcrError = 'On-device OCR ran but found no recognizable amount in the image.';
+                        }
+                    } catch (tessErr) {
+                        console.error('Tesseract OCR error:', tessErr);
+                        lastOcrError = lastOcrError || `On-device OCR failed to load/run: ${tessErr.message || tessErr}`;
+                    }
+                }
+
+                // STEP 3: Show Result Form
+                document.getElementById('scanLine').classList.add('hidden');
+                if (detectedAmount > 0) {
+                    const sourceLabel = usedSource === 'gemini' ? 'Gemini AI' : 'on-device OCR';
+                    statusText.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> Detected via ${sourceLabel}`;
+                } else {
+                    statusText.innerHTML = `<span class="text-amber-400">${lastOcrError || 'Could not detect an amount automatically.'} Please fill in manually.</span>`;
+                }
+
+                document.getElementById('ocrAmount').value = detectedAmount > 0 ? detectedAmount : '';
+                document.getElementById('ocrNote').value = detectedNote;
+                document.getElementById('ocrCategory').value = detectedCategory;
+
+                document.getElementById('ocrResultCard').classList.remove('hidden');
+
+            } catch (err) {
+                console.error("OCR Scan Error:", err);
+                document.getElementById('scanLine').classList.add('hidden');
+                statusText.innerHTML = `<span class="text-red-400">Scan failed: ${err.message || err}. Enter details below.</span>`;
+                document.getElementById('ocrResultCard').classList.remove('hidden');
+            }
+        }
+
+        /* Downscale + grayscale + contrast-boost an image before OCR.
+           Big color screenshots confuse Tesseract; this consistently improves
+           read accuracy on UPI app receipts and speeds up processing. */
+        function preprocessImageForOcr(file) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        const MAX_DIM = 1200;
+                        let { width, height } = img;
+                        if (width > MAX_DIM || height > MAX_DIM) {
+                            const scale = MAX_DIM / Math.max(width, height);
+                            width = Math.round(width * scale);
+                            height = Math.round(height * scale);
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        const imageData = ctx.getImageData(0, 0, width, height);
+                        const d = imageData.data;
+                        const contrast = 1.35;
+                        const intercept = 128 * (1 - contrast);
+                        for (let i = 0; i < d.length; i += 4) {
+                            const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+                            const adjusted = Math.min(255, Math.max(0, gray * contrast + intercept));
+                            d[i] = d[i + 1] = d[i + 2] = adjusted;
+                        }
+                        ctx.putImageData(imageData, 0, 0);
+
+                        canvas.toBlob((blob) => {
+                            URL.revokeObjectURL(img.src);
+                            blob ? resolve(blob) : reject(new Error('Canvas toBlob failed'));
+                        }, 'image/png');
+                    } catch (e) {
+                        reject(e);
+                    }
+                };
+                img.onerror = () => reject(new Error('Could not load image for preprocessing'));
+                img.src = URL.createObjectURL(file);
+            });
+        }
+
+        /* CLIENT SIDE PARSER FOR TEXT AMTS */
+        function extractAmountFromText(rawText) {
+            if (!rawText) return { amount: 0, note: 'Scanned Payment' };
+
+            // Look for currency symbols & numbers
+            const lines = rawText.split('\n');
+            let foundAmount = 0;
+            let noteCandidate = '';
+
+            for (let line of lines) {
+                // Look for patterns like ₹200, RS 60, INR 1450, 200.00
+                // Note: OCR very often misreads the ₹ glyph as "?", "?", or "3" on
+                // low-res UPI screenshots, so those are matched too.
+                const match = line.match(/(?:₹|Rs\.?|INR|\$|[?])\s*([\d,]+(?:\.\d{1,2})?)/i) ||
+                              line.match(/([\d,]+(?:\.\d{1,2})?)\s*(?:₹|Rs\.?|INR|\$)/i) ||
+                              line.match(/\b(?:Paid|Total|Amount|Debited|Sent)\b[:\s]*(?:₹|Rs\.?|INR|\$|[?])?\s*([\d,]+(?:\.\d{1,2})?)/i);
+
+                if (match && match[1]) {
+                    const cleanNum = parseFloat(match[1].replace(/,/g, ''));
+                    if (cleanNum > 0 && cleanNum < 1000000) {
+                        foundAmount = cleanNum;
+                        break;
+                    }
+                }
+            }
+
+            // Extract merchant name if available
+            const merchantMatch = rawText.match(/(?:To|Paid to|Merchant|At)[:\s]*([A-Za-z0-9\s]{3,20})/i);
+            if (merchantMatch && merchantMatch[1]) {
+                noteCandidate = merchantMatch[1].trim();
+            }
+
+            return { amount: foundAmount, note: noteCandidate || 'Scanned Payment' };
+        }
+
+        /* GEMINI VISION API CALL */
+        async function callGeminiVision(base64Image, apiKey) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
+            const prompt = "Extract total expense amount, merchant name/note, and category from this receipt/payment screenshot. Respond ONLY in valid JSON: {\"amount\": number, \"note\": \"string\", \"category\": \"string\"}";
+
+            const payload = {
+                contents: [{
+                    parts: [
+                        { text: prompt },
+                        { inlineData: { mimeType: "image/jpeg", data: base64Image } }
+                    ]
+                }]
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errBody = await response.text().catch(() => '');
+                console.error(`Gemini API error (${response.status}):`, errBody);
+                lastOcrError = `Gemini API error ${response.status}: ${errBody.slice(0, 200)}`;
+                return null;
+            }
+            const resData = await response.json();
+            const textResponse = resData?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+            if (textResponse) {
+                const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    try {
+                        return JSON.parse(jsonMatch[0]);
+                    } catch (e) {
+                        console.error('Gemini returned non-JSON text:', textResponse);
+                        lastOcrError = 'Gemini response could not be parsed as JSON.';
+                        return null;
+                    }
+                }
+            }
+            console.warn('Gemini response had no usable text:', resData);
+            lastOcrError = 'Gemini returned an empty/blocked response.';
+            return null;
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        function saveOcrExpense() {
+            const amount = parseFloat(document.getElementById('ocrAmount').value);
+            const category = document.getElementById('ocrCategory').value;
+            const note = document.getElementById('ocrNote').value.trim();
+
+            if (!amount || amount <= 0) {
+                alertToast("Please enter a valid amount");
+                return;
+            }
+
+            const newExpense = {
+                id: 'ex_' + Date.now(),
+                amount: amount,
+                category: category,
+                note: note || 'Scanned Receipt',
+                date: new Date().toISOString()
+            };
+
+            state.expenses.unshift(newExpense);
+            saveExpensesToStorage();
+            discardOcrResult();
+            alertToast("Scanned expense saved!");
+        }
+
+        function discardOcrResult() {
+            document.getElementById('ocrResultCard').classList.add('hidden');
+            document.getElementById('uploadPrompt').classList.remove('hidden');
+            document.getElementById('scannerPreview').classList.add('hidden');
+            document.getElementById('fileInput').value = '';
+        }
+
+        /* RENDER EXPENSE LIST (GROUPED BY DATE) */
+        function renderExpenses() {
+            const container = document.getElementById('expenseListContainer');
+            if (!container) return;
+
+            const searchQuery = (document.getElementById('searchInput')?.value || '').toLowerCase();
+            const categoryFilter = document.getElementById('filterCategory')?.value || 'ALL';
+
+            let filtered = state.expenses.filter(ex => {
+                const matchesSearch = ex.note.toLowerCase().includes(searchQuery) || ex.amount.toString().includes(searchQuery);
+                const matchesCat = categoryFilter === 'ALL' || ex.category === categoryFilter;
+                return matchesSearch && matchesCat;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 bg-brand-card/50 border border-brand-border rounded-2xl">
+                        <i class="fa-solid fa-receipt text-2xl text-brand-textSecondary mb-2"></i>
+                        <p class="text-xs text-brand-textSecondary">No expense records found</p>
+                    </div>`;
+                return;
+            }
+
+            // Group by Date
+            const groups = {};
+            filtered.forEach(ex => {
+                const dateKey = new Date(ex.date).toLocaleDateString('en-IN', {
+                    day: 'numeric', month: 'short', year: 'numeric'
+                });
+                if (!groups[dateKey]) groups[dateKey] = [];
+                groups[dateKey].push(ex);
+            });
+
+            container.innerHTML = '';
+
+            Object.keys(groups).forEach(dateStr => {
+                const groupHeader = document.createElement('div');
+                groupHeader.className = 'text-[11px] font-bold text-brand-textSecondary uppercase tracking-wider mt-3 mb-1 px-1';
+                groupHeader.textContent = dateStr;
+                container.appendChild(groupHeader);
+
+                groups[dateStr].forEach(ex => {
+                    const catObj = state.categories.find(c => c.id === ex.category) || { name: 'General', color: '#10b981', icon: 'fa-tag' };
+                    
+                    const card = document.createElement('div');
+                    card.className = 'bg-brand-card border border-brand-border rounded-xl p-3 flex items-center justify-between gap-2 shadow-md hover:border-brand-border/80 transition-all';
+                    card.innerHTML = `
+                        <div class="flex items-center space-x-3 min-w-0 flex-1">
+                            <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-white shadow-sm" style="background-color: ${catObj.color}20; border: 1px solid ${catObj.color}40; color: ${catObj.color};">
+                                <i class="fa-solid ${catObj.icon} text-sm"></i>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <h4 class="text-xs font-bold text-white truncate-1">${escapeHtml(ex.note)}</h4>
+                                <div class="flex items-center gap-2 mt-0.5">
+                                    <span class="text-[10px] px-2 py-0.5 rounded-md font-semibold truncate-1" style="background: ${catObj.color}15; color: ${catObj.color};">
+                                        ${escapeHtml(catObj.name)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center space-x-2 shrink-0">
+                            <div class="text-right">
+                                <div class="text-xs font-bold text-white">${state.settings.currencySymbol}${ex.amount.toFixed(2)}</div>
+                            </div>
+                            <button onclick="deleteExpense('${ex.id}')" class="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center transition-all ml-1" title="Delete">
+                                <i class="fa-solid fa-trash-can text-[11px]"></i>
+                            </button>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            });
+        }
+
+        function deleteExpense(id) {
+            state.expenses = state.expenses.filter(ex => ex.id !== id);
+            saveExpensesToStorage();
+            alertToast("Expense removed");
+        }
+
+        /* RENDER DASHBOARD & CHARTS */
+        function renderAnalytics() {
+            const todayStr = new Date().toDateString();
+            const currentMonth = new Date().getMonth();
+            const currentYear = new Date().getFullYear();
+
+            let todayTotal = 0;
+            let todayCount = 0;
+            let monthTotal = 0;
+
+            const categoryTotals = {};
+
+            state.expenses.forEach(ex => {
+                const exDate = new Date(ex.date);
+                
+                // Today Stats
+                if (exDate.toDateString() === todayStr) {
+                    todayTotal += ex.amount;
+                    todayCount++;
+                }
+
+                // Month Stats
+                if (exDate.getMonth() === currentMonth && exDate.getFullYear() === currentYear) {
+                    monthTotal += ex.amount;
+                    categoryTotals[ex.category] = (categoryTotals[ex.category] || 0) + ex.amount;
+                }
+            });
+
+            // Update Metric Text
+            document.getElementById('statSpentToday').textContent = `${state.settings.currencySymbol}${todayTotal.toFixed(2)}`;
+            document.getElementById('statTodayCount').textContent = `${todayCount} transaction${todayCount === 1 ? '' : 's'}`;
+            document.getElementById('statSpentMonth').textContent = `${state.settings.currencySymbol}${monthTotal.toFixed(2)}`;
+
+            // Top Category
+            let topCatId = '';
+            let topCatVal = 0;
+            Object.keys(categoryTotals).forEach(catId => {
+                if (categoryTotals[catId] > topCatVal) {
+                    topCatVal = categoryTotals[catId];
+                    topCatId = catId;
+                }
+            });
+            const topCatObj = state.categories.find(c => c.id === topCatId);
+            document.getElementById('statTopCategory').textContent = topCatObj ? `Top: ${topCatObj.name}` : 'Top: -';
+
+            // Donut Chart SVG Render
+            renderDonutChart(categoryTotals, monthTotal);
+        }
+
+        function renderDonutChart(catTotals, grandTotal) {
+            const svg = document.getElementById('donutChartSvg');
+            const legend = document.getElementById('chartLegend');
+            const donutTotalText = document.getElementById('donutTotalText');
+
+            if (!svg || !legend) return;
+
+            svg.innerHTML = '';
+            legend.innerHTML = '';
+            donutTotalText.textContent = `${state.settings.currencySymbol}${grandTotal.toFixed(0)}`;
+
+            if (grandTotal <= 0) {
+                legend.innerHTML = '<p class="text-[11px] text-brand-textSecondary py-2">No monthly data available</p>';
+                return;
+            }
+
+            let accumulatedAngle = 0;
+            const radius = 40;
+            const circumference = 2 * Math.PI * radius;
+
+            Object.keys(catTotals).forEach(catId => {
+                const amount = catTotals[catId];
+                const catObj = state.categories.find(c => c.id === catId) || { name: 'Other', color: '#10b981' };
+                const percentage = amount / grandTotal;
+                const strokeDasharray = `${percentage * circumference} ${circumference}`;
+                const strokeDashoffset = -accumulatedAngle * circumference;
+
+                // SVG Circle Segment
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', '50');
+                circle.setAttribute('cy', '50');
+                circle.setAttribute('r', radius.toString());
+                circle.setAttribute('fill', 'transparent');
+                circle.setAttribute('stroke', catObj.color);
+                circle.setAttribute('stroke-width', '12');
+                circle.setAttribute('stroke-dasharray', strokeDasharray);
+                circle.setAttribute('stroke-dashoffset', strokeDashoffset.toString());
+                svg.appendChild(circle);
+
+                accumulatedAngle += percentage;
+
+                // Legend Item
+                const legendRow = document.createElement('div');
+                legendRow.className = 'flex items-center justify-between text-[11px]';
+                legendRow.innerHTML = `
+                    <div class="flex items-center space-x-2 truncate min-w-0 pr-2">
+                        <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${catObj.color}"></span>
+                        <span class="text-white truncate font-medium">${escapeHtml(catObj.name)}</span>
+                    </div>
+                    <span class="text-brand-textSecondary font-semibold shrink-0">${state.settings.currencySymbol}${amount.toFixed(0)}</span>
+                `;
+                legend.appendChild(legendRow);
+            });
+        }
+
+        /* EXPORT CSV */
+        function exportToCSV() {
+            if (state.expenses.length === 0) {
+                alertToast("No data to export!");
+                return;
+            }
+
+            let csv = "ID,Date,Amount,Category,Note\n";
+            state.expenses.forEach(ex => {
+                const catObj = state.categories.find(c => c.id === ex.category);
+                csv += `"${ex.id}","${ex.date}",${ex.amount},"${catObj ? catObj.name : ex.category}","${ex.note.replace(/"/g, '""')}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `SuperExpense_Log_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        /* ALARM & NOTIFICATION ENGINE */
+        function setupAlarmInterval() {
+            setInterval(() => {
+                if (!state.alarm.enabled || !state.alarm.time) return;
+
+                const now = new Date();
+                const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+                if (currentTime === state.alarm.time && now.getSeconds() === 0) {
+                    triggerTestAlarm();
+                }
+            }, 1000);
+        }
+
+        function triggerTestAlarm() {
+            // Web Audio Synth chime
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+                osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.3); // A5
+
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.8);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start();
+                osc.stop(ctx.currentTime + 0.8);
+            } catch(e) {
+                console.log("Audio play blocked", e);
+            }
+
+            alertToast("⏰ Spend Reminder: Log your daily UPI transactions!");
+        }
+
+        function toggleAlarmSetting() {
+            const isChecked = document.getElementById('alarmToggle').checked;
+            state.alarm.enabled = isChecked;
+            localStorage.setItem('super_alarm_enabled', isChecked);
+            updateAlarmUI();
+        }
+
+        function saveAlarmTime() {
+            const timeVal = document.getElementById('alarmTimeInput').value;
+            state.alarm.time = timeVal;
+            localStorage.setItem('super_alarm_time', timeVal);
+            updateAlarmUI();
+        }
+
+        function updateAlarmUI() {
+            const toggle = document.getElementById('alarmToggle');
+            const timeInput = document.getElementById('alarmTimeInput');
+            const statusText = document.getElementById('alarmStatusText');
+
+            if (toggle) toggle.checked = state.alarm.enabled;
+            if (timeInput) timeInput.value = state.alarm.time;
+
+            if (statusText) {
+                if (state.alarm.enabled) {
+                    statusText.textContent = `Alarm set for ${state.alarm.time} daily`;
+                    statusText.className = "text-xs font-semibold text-emerald-400 mt-0.5 block";
+                } else {
+                    statusText.textContent = "Alarm Disabled";
+                    statusText.className = "text-xs font-semibold text-brand-textSecondary mt-0.5 block";
+                }
+            }
+        }
+
+        /* CATEGORY MANAGER MODAL */
+        function openCategoryManagerModal() {
+            renderCategoryManagerList();
+            document.getElementById('categoryModal').classList.remove('hidden');
+        }
+
+        function closeCategoryManagerModal() {
+            document.getElementById('categoryModal').classList.add('hidden');
+        }
+
+        function renderCategoryManagerList() {
+            const container = document.getElementById('categoryListContainer');
+            if (!container) return;
+
+            container.innerHTML = '';
+            state.categories.forEach(cat => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-2 bg-brand-bg rounded-xl border border-brand-border';
+                item.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <span class="w-3.5 h-3.5 rounded-full" style="background-color: ${cat.color}"></span>
+                        <span class="text-xs font-semibold text-white">${escapeHtml(cat.name)}</span>
+                    </div>
+                    ${cat.id !== 'general' ? `
+                    <button onclick="deleteCategory('${cat.id}')" class="text-red-400 text-xs px-2 py-1 hover:bg-red-500/10 rounded-lg">
+                        Delete
+                    </button>` : ''}
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function handleCreateCategory(e) {
+            e.preventDefault();
+            const name = document.getElementById('newCatName').value.trim();
+            const color = document.getElementById('newCatColor').value;
+
+            if (!name) return;
+
+            const newCat = {
+                id: 'cat_' + Date.now(),
+                name: name,
+                color: color,
+                icon: 'fa-tag'
+            };
+
+            state.categories.push(newCat);
+            saveCategoriesToStorage();
+            renderCategoryManagerList();
+            document.getElementById('newCatName').value = '';
+        }
+
+        function deleteCategory(catId) {
+            state.categories = state.categories.filter(c => c.id !== catId);
+            saveCategoriesToStorage();
+            renderCategoryManagerList();
+        }
+
+        function matchCategoryByName(catName) {
+            if (!catName) return 'general';
+            const lower = catName.toLowerCase();
+            const found = state.categories.find(c => c.name.toLowerCase().includes(lower) || lower.includes(c.id));
+            return found ? found.id : 'general';
+        }
+
+        /* SETTINGS & MODALS */
+        function toggleSettingsModal() {
+            const modal = document.getElementById('settingsModal');
+            modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) {
+                document.getElementById('geminiApiKeyInput').value = state.settings.geminiApiKey;
+                document.getElementById('currencySymbolInput').value = state.settings.currencySymbol;
+            }
+        }
+
+        function saveSettings() {
+            const key = document.getElementById('geminiApiKeyInput').value.trim();
+            const symbol = document.getElementById('currencySymbolInput').value.trim() || '₹';
+
+            state.settings.geminiApiKey = key;
+            state.settings.currencySymbol = symbol;
+
+            localStorage.setItem('super_gemini_key', key);
+            localStorage.setItem('super_currency', symbol);
+
+            toggleSettingsModal();
+            renderExpenses();
+            renderAnalytics();
+            alertToast("Settings updated!");
+        }
+
+        function toggleInstallModal() {
+            document.getElementById('installModal').classList.toggle('hidden');
+        }
+
+        /* TOAST UTILITY */
+        function alertToast(msg) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-brand-card border border-emerald-500/50 text-white text-xs font-semibold rounded-full shadow-2xl flex items-center gap-2 animate-bounce';
+            toast.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> ${msg}`;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 2500);
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+    </script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch((e) => console.warn('SW registration failed', e));
+            });
+        }
+    </script>
+</body>
+</html>
