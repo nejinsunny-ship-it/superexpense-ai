@@ -68,7 +68,7 @@
       <!-- Upload Card -->
       <section class="glass rounded-2xl p-5 border border-cyan-500/20 relative overflow-hidden">
         <h2 class="text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-1">AI Screenshot Reader</h2>
-        <p class="text-xs text-gray-400 mb-4 leading-relaxed">Upload screenshots from SuperMoney, GPay, PhonePe, or Paytm.</p>
+        <p class="text-xs text-gray-400 mb-4 leading-relaxed">Upload payment screenshots (SuperMoney, GPay, PhonePe, Paytm).</p>
 
         <div id="drop-zone" class="border-2 border-dashed border-gray-700 hover:border-cyan-400 rounded-xl p-5 flex flex-col items-center justify-center text-center cursor-pointer bg-gray-900/40 transition-colors">
           <div class="w-12 h-12 rounded-full bg-cyan-950/60 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-2xl mb-2">📸</div>
@@ -162,6 +162,39 @@
       </button>
     </div>
   </nav>
+
+  <!-- MODAL: EDIT EXPENSE -->
+  <div id="edit-modal" class="hidden fixed inset-0 z-50 glass bg-black/80 flex items-center justify-center p-4">
+    <div class="glass max-w-sm w-full rounded-2xl p-5 border border-cyan-500/30 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-white">Edit Transaction Details</h3>
+        <button onclick="toggleModal('edit-modal', false)" class="text-gray-400 text-lg">✕</button>
+      </div>
+      <form id="edit-form" onsubmit="handleEditSubmit(event)" class="space-y-3">
+        <input type="hidden" id="edit-id" />
+        <div>
+          <label class="text-xs text-gray-400">Merchant / Recipient Name</label>
+          <input type="text" id="edit-merchant" required class="w-full glass-input rounded-xl px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400">Amount (₹)</label>
+          <input type="number" step="any" id="edit-amount" required class="w-full glass-input rounded-xl px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400">Category</label>
+          <select id="edit-category" class="w-full glass-input rounded-xl px-3 py-2 text-sm bg-gray-900"></select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400">Transaction Date</label>
+          <input type="date" id="edit-date" required class="w-full glass-input rounded-xl px-3 py-2 text-sm" />
+        </div>
+        <div class="flex space-x-2 pt-2">
+          <button type="button" onclick="toggleModal('edit-modal', false)" class="w-1/2 glass text-gray-300 font-medium py-2.5 rounded-xl text-sm">Cancel</button>
+          <button type="submit" class="w-1/2 bg-cyan-500 text-black font-bold py-2.5 rounded-xl text-sm">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- MODAL: SETTINGS -->
   <div id="settings-modal" class="hidden fixed inset-0 z-50 glass bg-black/80 flex items-center justify-center p-4">
@@ -430,8 +463,11 @@ If unreadable, return {"transactions": []}. Return ONLY valid JSON, no markdown.
 
     // CATEGORY MANAGEMENT
     function renderCategoryDropdowns() {
-      const select = document.getElementById('manual-category');
-      select.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+      const selectManual = document.getElementById('manual-category');
+      const selectEdit = document.getElementById('edit-category');
+      const optionsHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+      selectManual.innerHTML = optionsHTML;
+      selectEdit.innerHTML = optionsHTML;
     }
 
     function renderCategoriesList() {
@@ -464,7 +500,7 @@ If unreadable, return {"transactions": []}. Return ONLY valid JSON, no markdown.
       renderCategoriesList();
     }
 
-    // MANUAL SUBMIT
+    // MANUAL & EDIT SUBMITS
     function handleManualSubmit(e) {
       e.preventDefault();
       const merchant = document.getElementById('manual-merchant').value.trim();
@@ -480,6 +516,38 @@ If unreadable, return {"transactions": []}. Return ONLY valid JSON, no markdown.
         e.target.reset();
         document.getElementById('manual-date').value = new Date().toISOString().split('T')[0];
       }
+    }
+
+    function openEditModal(index) {
+      const item = expenses[index];
+      if (!item) return;
+
+      document.getElementById('edit-id').value = index;
+      document.getElementById('edit-merchant').value = item.merchant;
+      document.getElementById('edit-amount').value = item.amount;
+      document.getElementById('edit-category').value = categories.includes(item.category) ? item.category : categories[0];
+      document.getElementById('edit-date').value = item.date || new Date().toISOString().split('T')[0];
+
+      toggleModal('edit-modal', true);
+    }
+
+    function handleEditSubmit(e) {
+      e.preventDefault();
+      const index = parseInt(document.getElementById('edit-id').value, 10);
+      if (isNaN(index) || !expenses[index]) return;
+
+      expenses[index] = {
+        ...expenses[index],
+        merchant: document.getElementById('edit-merchant').value.trim(),
+        amount: parseFloat(document.getElementById('edit-amount').value),
+        category: document.getElementById('edit-category').value,
+        date: document.getElementById('edit-date').value
+      };
+
+      localStorage.setItem('superexpense_data', JSON.stringify(expenses));
+      renderExpenses();
+      toggleModal('edit-modal', false);
+      showBanner('Transaction updated successfully!', false);
     }
 
     // RENDER EXPENSES
@@ -500,13 +568,14 @@ If unreadable, return {"transactions": []}. Return ONLY valid JSON, no markdown.
         total += Number(item.amount || 0);
         return `
           <div class="glass p-3 rounded-xl flex justify-between items-center border-l-4 border-cyan-400">
-            <div class="pr-2 truncate">
+            <div class="pr-2 truncate cursor-pointer" onclick="openEditModal(${idx})">
               <p class="text-sm font-semibold text-white truncate">${item.merchant}</p>
               <p class="text-[10px] text-gray-400">${item.date} • <span class="text-cyan-400">${item.category}</span></p>
             </div>
-            <div class="flex items-center space-x-3 shrink-0">
-              <span class="text-sm font-extrabold text-white">₹${item.amount}</span>
-              <button onclick="deleteExpense(${idx})" class="text-gray-500 hover:text-red-400 text-xs">✕</button>
+            <div class="flex items-center space-x-2 shrink-0">
+              <span class="text-sm font-extrabold text-white mr-1">₹${item.amount}</span>
+              <button onclick="openEditModal(${idx})" class="p-1 text-gray-400 hover:text-cyan-400 text-xs" title="Edit">✏️</button>
+              <button onclick="deleteExpense(${idx})" class="p-1 text-gray-500 hover:text-red-400 text-xs" title="Delete">✕</button>
             </div>
           </div>
         `;
