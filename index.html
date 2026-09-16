@@ -36,12 +36,12 @@
     <!-- Upload Section -->
     <section class="glass rounded-2xl p-5 border border-cyan-500/20 relative overflow-hidden">
       <h2 class="text-sm font-semibold text-cyan-400 uppercase tracking-wider mb-2">Scan Screenshot</h2>
-      <p class="text-xs text-gray-400 mb-4">Upload payment screenshots (SuperMoney, GPay, PhonePe, Paytm).</p>
+      <p class="text-xs text-gray-400 mb-4">Upload payment screenshots or transaction history (SuperMoney, GPay, PhonePe, Paytm).</p>
 
       <div id="drop-zone" class="border-2 border-dashed border-gray-700 hover:border-cyan-400 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer bg-gray-900/40">
         <div class="w-12 h-12 rounded-full bg-cyan-950/60 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-2xl mb-3">📸</div>
         <p class="text-sm font-medium text-gray-200">Tap to upload transaction screenshot</p>
-        <p class="text-xs text-gray-500 mt-1">Direct Gemini AI OCR parsing</p>
+        <p class="text-xs text-gray-500 mt-1">Multi-transaction AI Extraction</p>
         <input type="file" id="file-input" accept="image/*" class="hidden" />
       </div>
 
@@ -49,7 +49,7 @@
       <div id="scanning-overlay" class="hidden absolute inset-0 glass bg-black/90 flex flex-col items-center justify-center z-10 p-4 text-center">
         <div class="w-12 h-12 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mb-4"></div>
         <p id="scanning-status" class="text-sm font-semibold text-cyan-300">Scanning using Gemini AI...</p>
-        <p class="text-xs text-gray-400 mt-1">Analyzing pixels for merchant, amount & date</p>
+        <p class="text-xs text-gray-400 mt-1">Extracting all transactions from image</p>
       </div>
     </section>
 
@@ -141,18 +141,19 @@
       statusText.innerText = 'Compressing image...';
 
       try {
-        const base64Img = await resizeImage(file, 800);
-        statusText.innerText = 'Scanning using Gemini AI...';
+        const base64Img = await resizeImage(file, 1000);
+        statusText.innerText = 'Scanning all transactions with Gemini AI...';
 
-        const result = await callGeminiAPI(base64Img);
+        const extractedList = await callGeminiAPI(base64Img);
 
-        if (result && result.amount) {
-          expenses.unshift(result);
+        if (extractedList && extractedList.length > 0) {
+          // Unshift all items so newer items appear top
+          expenses = [...extractedList, ...expenses];
           localStorage.setItem('superexpense_data', JSON.stringify(expenses));
           renderExpenses();
-          showBanner(`Extracted ₹${result.amount} spent at ${result.merchant}`, false);
+          showBanner(`Extracted ${extractedList.length} transaction(s) successfully!`, false);
         } else {
-          showBanner('Gemini AI could not extract transaction details from this image.', true);
+          showBanner('Gemini AI could not extract valid transactions from this image.', true);
         }
       } catch (err) {
         console.error('Scan Failed:', err);
@@ -166,27 +167,31 @@
     async function callGeminiAPI(base64Data) {
       const cleanBase64 = base64Data.replace(/^data:image\/(png|jpeg|webp|jpg);base64,/, '');
       
-      // Target active models in order of priority
       const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash'];
 
-      const promptText = `Examine this payment/UPI screenshot (SuperMoney, PhonePe, Paytm, Google Pay). 
-Extract the transaction info into raw JSON matching exact format:
+      // Instructed to return an ARRAY of transactions
+      const promptText = `Examine this payment or transaction screenshot (SuperMoney, PhonePe, Paytm, Google Pay, Bank Statement). 
+Identify EVERY transaction visible in the image. 
+Return raw JSON with a single key "transactions" containing an array of objects matching this exact structure:
 {
-  "merchant": "Merchant or Receiver Name",
-  "amount": 200,
-  "category": "Food & Dining | Shopping | UPI Transfer | Bills & Utilities | Other",
-  "date": "YYYY-MM-DD"
+  "transactions": [
+    {
+      "merchant": "Merchant or Receiver Name",
+      "amount": 200,
+      "category": "Food & Dining | Shopping | UPI Transfer | Bills & Utilities | Other",
+      "date": "YYYY-MM-DD"
+    }
+  ]
 }
-If amount or merchant cannot be clearly found, return {"error": "unreadable"}. Return ONLY raw JSON, no markdown formatting.`;
+If no readable transactions are present, return {"transactions": []}. Return ONLY valid raw JSON without markdown or formatting.`;
 
       let lastError = '';
 
       for (const model of modelsToTry) {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 sec timeout
+          const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-          // Standard header authentication format
           const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
             method: 'POST',
             headers: { 
@@ -217,17 +222,22 @@ If amount or merchant cannot be clearly found, return {"error": "unreadable"}. R
           const cleanJson = rawOutput.replace(/```json/g, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
 
-          if (parsed.error === 'unreadable' || !parsed.amount) {
-            throw new Error('Image unreadable or missing payment details.');
+          const items = parsed.transactions || (Array.isArray(parsed) ? parsed : []);
+
+          if (!items.length) {
+            throw new Error('No transactions found in this image.');
           }
 
-          return {
-            id: Date.now(),
-            merchant: parsed.merchant || 'UPI Merchant',
-            amount: parseFloat(parsed.amount),
-            category: parsed.category || 'UPI Transfer',
-            date: parsed.date || new Date().toISOString().split('T')[0]
-          };
+          const todayStr = new Date().toISOString().split('T')[0];
+
+          return items.map((t, idx) => ({
+            id: Date.now() + idx,
+            merchant: t.merchant || 'UPI Merchant',
+            amount: parseFloat(t.amount) || 0,
+            category: t.category || 'UPI Transfer',
+            date: t.date || todayStr
+          })).filter(t => t.amount > 0);
+
         } catch (e) {
           lastError = e.message;
           console.warn(`Model ${model} failed:`, e.message);
